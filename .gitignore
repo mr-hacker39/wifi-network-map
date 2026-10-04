@@ -1,0 +1,54 @@
+# ==========================================
+# WiFi Network Map - Git Ignore
+# ==========================================
+
+# Python virtual environment
+venv/
+.venv/
+env/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Generated network scan data
+data/*.csv
+data/*.json
+data/*.xml
+
+# Logs
+logs/*.log
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# VS Code local settings
+.vscode/
+
+# Test / coverage files
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build files
+build/
+dist/
+*.egg-info/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Network scan temporary files
+scan_results/
