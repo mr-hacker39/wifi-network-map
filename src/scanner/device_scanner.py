@@ -3,6 +3,8 @@ import xml.etree.ElementTree as ET
 import ipaddress
 import re
 
+from scan_storage import save_scan
+from scanner.device import Device
 
 def get_network():
     """Automatically detect the IPv4 network used by the default route."""
@@ -126,15 +128,16 @@ def parse_devices(xml_output):
                         "Unknown"
                     )
 
-            devices.append(
-                {
-                    "ip": ip_address,
-                    "mac": mac_address,
-                    "hostname": hostname,
-                    "vendor": vendor,
-                    "status": "up"
-                }
+            device = Device(
+                ip=ip_address,
+                mac=mac_address,
+                hostname=hostname,
+                vendor=vendor,
+                status="up"
             )
+
+            devices.append(device.to_dict())
+            
 
     except ET.ParseError as error:
         print("Failed to parse Nmap XML output.")
@@ -187,6 +190,10 @@ def main():
     devices = parse_devices(scan_output)
 
     display_devices(devices)
+
+    scan_file = save_scan(network, devices)
+
+    print(f"\nScan results saved to: {scan_file}")
 
 
 if __name__ == "__main__":
