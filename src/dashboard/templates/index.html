@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WiFi Network Map Dashboard</title>
+    
     <style>
         * { box-sizing: border-box; }
         body {
@@ -71,7 +72,28 @@
     <p>Network discovery and monitoring dashboard</p>
 </header>
 
+<form action="{{ url_for('rescan') }}" method="POST"
+      style="margin-top: 18px;">
+    <button type="submit"
+            style="background:#2563eb;color:white;border:0;
+                   padding:12px 18px;border-radius:8px;
+                   cursor:pointer;font-size:14px;">
+        ↻ Rescan Network
+    </button>
+</form>
+
 <main>
+    
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+        <div style="padding:14px;margin-bottom:18px;border-radius:8px;
+                    background:{% if category == 'success' %}#12352f{% else %}#48232b{% endif %};
+                    color:{% if category == 'success' %}#34d399{% else %}#fca5a5{% endif %};">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endwith %}
+
     <h2>Overview</h2>
 
     <section class="stats">
@@ -143,6 +165,89 @@
     </section>
 </main>
 
-<footer>WiFi Network Map · MCA Mini Project</footer>
+<footer>WiFi Network Map ·</footer>
+
+<section class="panel" id="live-monitoring">
+    <h2>Live Network Monitoring</h2>
+
+    <p>
+        Status:
+        <strong>{{ "Running" if monitor.running else "Stopped" }}</strong>
+    </p>
+
+    <p>{{ monitor.message }}</p>
+
+    {% if monitor.last_scan %}
+        <p>Last successful scan: {{ monitor.last_scan }}</p>
+    {% endif %}
+
+    {% if monitor.last_error %}
+        <p style="color: #fca5a5;">
+            Latest error: {{ monitor.last_error }}
+        </p>
+    {% endif %}
+
+    <form action="{{ url_for('monitor_start') }}" method="POST">
+        <label for="interval">Scan interval:</label>
+        <select name="interval" id="interval">
+            <option value="30">30 seconds</option>
+            <option value="60" selected>1 minute</option>
+            <option value="120">2 minutes</option>
+            <option value="300">5 minutes</option>
+        </select>
+        <button type="submit">Start Monitoring</button>
+    </form>
+
+    <form action="{{ url_for('monitor_stop') }}" method="POST"
+          style="margin-top: 12px;">
+        <button type="submit">Stop Monitoring</button>
+    </form>
+
+    <p>
+        <a href="{{ url_for('history_page') }}">
+            View full scan history and device events →
+        </a>
+    </p>
+
+    <p>
+        <small>
+            Monitoring runs while the Flask server is running.
+            Refresh this page to see updated results.
+        </small>
+    </p>
+</section>
+
+<section class="panel" id="recent-events">
+    <h2>Recent Device Events</h2>
+
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>IP Address</th>
+                    <th>Hostname</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in events %}
+                <tr>
+                    <td>{{ event.time }}</td>
+                    <td>{{ event.type }}</td>
+                    <td>{{ event.ip }}</td>
+                    <td>{{ event.hostname }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4">No device events recorded yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
 </body>
 </html>
+
+

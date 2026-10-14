@@ -1,0 +1,110 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Scan History</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 24px;
+            background: #0f172a;
+            color: #e2e8f0;
+            font-family: Arial, sans-serif;
+        }
+        main { max-width: 1100px; margin: auto; }
+        a { color: #38bdf8; }
+        .panel {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        h1, h2 { color: #f8fafc; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 550px;
+        }
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #334155;
+            text-align: left;
+            font-size: 14px;
+        }
+        th { color: #7dd3fc; }
+        .muted { color: #94a3b8; }
+    </style>
+</head>
+<body>
+<main>
+    <p><a href="/">← Back to Network Dashboard</a></p>
+    <h1>Network Scan History</h1>
+    <p class="muted">Previous scans and recorded device events.</p>
+
+    <section class="panel">
+        <h2>Recent Scans</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Network</th>
+                    <th>Devices Found</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in history %}
+                <tr>
+                    <td>{{ item.time }}</td>
+                    <td>{{ item.network }}</td>
+                    <td>{{ item.device_count }}</td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="3">No scan history yet. Run a scan from the dashboard.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="panel">
+        <h2>Device Events</h2>
+        <p class="muted">
+            “Not seen” means a device was absent from a later scan;
+            it does not prove the device has permanently left the network.
+        </p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>IP Address</th>
+                    <th>Hostname</th>
+                    <th>MAC Address</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for event in events %}
+                <tr>
+                    <td>{{ event.time }}</td>
+                    <td>{{ event.type }}</td>
+                    <td>{{ event.ip }}</td>
+                    <td>{{ event.hostname }}</td>
+                    <td>{{ event.mac }}</td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="5">No device events recorded yet.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>
