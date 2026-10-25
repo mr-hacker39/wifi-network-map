@@ -118,6 +118,22 @@
 
     <section class="panel" id="devices">
         <h2>Discovered Devices</h2>
+        <div class="device-filters">
+            <input
+                type="search"
+                id="device-search"
+                placeholder="Search IP, MAC, hostname, or vendor..."
+                aria-label="Search devices"
+            >
+
+            <select id="device-status-filter" aria-label="Filter by status">
+                <option value="all">All statuses</option>
+                <option value="up">Up</option>
+                <option value="down">Down</option>
+            </select>
+
+            <span id="device-result-count" aria-live="polite"></span>
+        </div>
         <div class="table-wrap">
             <table>
                 <thead>
@@ -250,10 +266,17 @@
     </div>
 </section>
 
+
 <script>
 (() => {
     const refreshInterval = 15000;
-    let lastMapScanTime = document.getElementById("last-scan-time")?.textContent.trim();
+
+    const deviceSearch = document.getElementById("device-search");
+    const deviceStatusFilter = document.getElementById("device-status-filter");
+    const deviceResultCount = document.getElementById("device-result-count");
+
+    let lastMapScanTime =
+        document.getElementById("last-scan-time")?.textContent.trim() || "";
 
     function escapeHtml(value) {
         return String(value ?? "Unknown").replace(/[&<>"']/g, character => ({
@@ -263,6 +286,68 @@
             '"': "&quot;",
             "'": "&#39;"
         })[character]);
+    }
+
+    function filterDevices() {
+        const searchText = (deviceSearch?.value || "").trim().toLowerCase();
+        const selectedStatus = deviceStatusFilter?.value || "all";
+        const deviceBody = document.getElementById("device-table-body");
+
+        if (!deviceBody) return;
+
+        const rows = Array.from(deviceBody.querySelectorAll("tr"));
+        let visibleCount = 0;
+        let deviceCount = 0;
+
+        rows.forEach(row => {
+            const cells = row.querySelectorAll("td");
+
+            // Keep placeholder rows visible.
+            if (cells.length < 5) {
+                row.style.display = "";
+                return;
+            }
+
+            deviceCount++;
+
+            const rowText = row.textContent.toLowerCase();
+            const status = (cells[4].textContent || "").trim().toLowerCase();
+
+            const matchesSearch = rowText.includes(searchText);
+            const matchesStatus =
+                selectedStatus === "all" || status === selectedStatus;
+
+            const visible = matchesSearch && matchesStatus;
+            row.style.display = visible ? "" : "none";
+
+            if (visible) visibleCount++;
+        });
+
+        if (deviceResultCount) {
+            deviceResultCount.textContent =
+                `Showing ${visibleCount} of ${deviceCount} devices`;
+        }
+    }
+
+    deviceSearch?.addEventListener("input", filterDevices);
+    deviceStatusFilter?.addEventListener("change", filterDevices);
+
+    function refreshRecentEvents(events) {
+        const section = document.getElementById("recent-events");
+        const body = section?.querySelector("tbody");
+
+        if (!body) return;
+
+        body.innerHTML = events.length
+            ? events.map(event => `
+                <tr>
+                    <td>${escapeHtml(event.time)}</td>
+                    <td>${escapeHtml(event.type)}</td>
+                    <td>${escapeHtml(event.ip)}</td>
+                    <td>${escapeHtml(event.hostname)}</td>
+                </tr>
+            `).join("")
+            : '<tr><td colspan="4">No device events recorded yet.</td></tr>';
     }
 
     async function refreshDashboard() {
@@ -301,10 +386,14 @@
                         </tr>
                     `).join("")
                     : '<tr><td colspan="5">No scan data available. Run the scanner first.</td></tr>';
+
+                // Apply the current search and status after rebuilding the table.
+                filterDevices();
             }
 
             if (monitorStatus) {
-                monitorStatus.textContent = data.monitor?.running ? "Running" : "Stopped";
+                monitorStatus.textContent =
+                    data.monitor?.running ? "Running" : "Stopped";
             }
 
             if (monitorMessage) {
@@ -312,12 +401,18 @@
             }
 
             const newScanTime = scan.scan_time || "";
+
             if (newScanTime && newScanTime !== lastMapScanTime) {
                 const mapFrame = document.querySelector(".map-frame");
+
                 if (mapFrame) {
-                    const separator = (data.map_url || "/network-map").includes("?") ? "&" : "?";
-                    mapFrame.src = `${data.map_url || "/network-map"}${separator}t=${encodeURIComponent(newScanTime)}`;
+                    const mapUrl = data.map_url || "/network-map";
+                    const separator = mapUrl.includes("?") ? "&" : "?";
+
+                    mapFrame.src =
+                        `${mapUrl}${separator}t=${encodeURIComponent(newScanTime)}`;
                 }
+
                 lastMapScanTime = newScanTime;
             }
 
@@ -327,29 +422,11 @@
         }
     }
 
-    function refreshRecentEvents(events) {
-        const section = document.getElementById("recent-events");
-        const body = section?.querySelector("tbody");
-        if (!body) return;
-
-        body.innerHTML = events.length
-            ? events.map(event => `
-                <tr>
-                    <td>${escapeHtml(event.time)}</td>
-                    <td>${escapeHtml(event.type)}</td>
-                    <td>${escapeHtml(event.ip)}</td>
-                    <td>${escapeHtml(event.hostname)}</td>
-                </tr>
-            `).join("")
-            : '<tr><td colspan="4">No device events recorded yet.</td></tr>';
-    }
-
+    // Filter the initially rendered table and start automatic refresh.
+    filterDevices();
     window.setInterval(refreshDashboard, refreshInterval);
 })();
 </script>
-</body>
 
 </body>
 </html>
-
-
