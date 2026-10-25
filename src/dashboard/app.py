@@ -8,6 +8,7 @@ from pathlib import Path
 from flask import (
     Flask,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -77,6 +78,19 @@ def dashboard():
         events=get_events(10),
     )
 
+
+@app.route("/api/dashboard-data")
+def dashboard_data():
+    """Return current dashboard information as JSON."""
+    scan = load_scan_data()
+
+    return jsonify({
+        "scan": scan,
+        "monitor": get_monitor_status(),
+        "history": get_history(10),
+        "events": get_events(10),
+        "map_url": url_for("network_map"),
+    })
 
 @app.route("/network-map")
 def network_map():

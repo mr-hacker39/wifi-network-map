@@ -109,7 +109,7 @@
         </div>
         <div class="card">
             <div class="card-label">Last Scan</div>
-            <div class="value" style="font-size:17px">
+            <div class="value" id="last-scan-time" style="font-size:17px">
                 {{ scan.get('scan_time', 'Not available') }}
             </div>
             <p class="muted">Timestamp from scan data</p>
@@ -129,7 +129,7 @@
                         <th>Status</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="device-table-body">
                 {% for device in scan.get('devices', []) %}
                     <tr>
                         <td>{{ device.get('ip', 'Unknown') }}</td>
@@ -172,10 +172,12 @@
 
     <p>
         Status:
-        <strong>{{ "Running" if monitor.running else "Stopped" }}</strong>
+        <strong id="monitor-status">
+            {{ "Running" if monitor.running else "Stopped" }}
+        </strong>
     </p>
 
-    <p>{{ monitor.message }}</p>
+    <p id="monitor-message">{{ monitor.message }}</p>
 
     {% if monitor.last_scan %}
         <p>Last successful scan: {{ monitor.last_scan }}</p>
@@ -247,6 +249,106 @@
         </table>
     </div>
 </section>
+
+<script>
+(() => {
+    const refreshInterval = 15000;
+    let lastMapScanTime = document.getElementById("last-scan-time")?.textContent.trim();
+
+    function escapeHtml(value) {
+        return String(value ?? "Unknown").replace(/[&<>"']/g, character => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;"
+        })[character]);
+    }
+
+    async function refreshDashboard() {
+        try {
+            const response = await fetch("/api/dashboard-data", {
+                headers: { "Accept": "application/json" },
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error(`Dashboard API returned ${response.status}`);
+            }
+
+            const data = await response.json();
+            const scan = data.scan || {};
+            const devices = Array.isArray(scan.devices) ? scan.devices : [];
+
+            const scanTimeElement = document.getElementById("last-scan-time");
+            const deviceBody = document.getElementById("device-table-body");
+            const monitorStatus = document.getElementById("monitor-status");
+            const monitorMessage = document.getElementById("monitor-message");
+
+            if (scanTimeElement) {
+                scanTimeElement.textContent = scan.scan_time || "Not available";
+            }
+
+            if (deviceBody) {
+                deviceBody.innerHTML = devices.length
+                    ? devices.map(device => `
+                        <tr>
+                            <td>${escapeHtml(device.ip)}</td>
+                            <td>${escapeHtml(device.mac)}</td>
+                            <td>${escapeHtml(device.hostname)}</td>
+                            <td>${escapeHtml(device.vendor)}</td>
+                            <td class="status">${escapeHtml(device.status || "unknown")}</td>
+                        </tr>
+                    `).join("")
+                    : '<tr><td colspan="5">No scan data available. Run the scanner first.</td></tr>';
+            }
+
+            if (monitorStatus) {
+                monitorStatus.textContent = data.monitor?.running ? "Running" : "Stopped";
+            }
+
+            if (monitorMessage) {
+                monitorMessage.textContent = data.monitor?.message || "";
+            }
+
+            const newScanTime = scan.scan_time || "";
+            if (newScanTime && newScanTime !== lastMapScanTime) {
+                const mapFrame = document.querySelector(".map-frame");
+                if (mapFrame) {
+                    const separator = (data.map_url || "/network-map").includes("?") ? "&" : "?";
+                    mapFrame.src = `${data.map_url || "/network-map"}${separator}t=${encodeURIComponent(newScanTime)}`;
+                }
+                lastMapScanTime = newScanTime;
+            }
+
+            refreshRecentEvents(data.events || []);
+        } catch (error) {
+            console.error("Automatic dashboard refresh failed:", error);
+        }
+    }
+
+    function refreshRecentEvents(events) {
+        const section = document.getElementById("recent-events");
+        const body = section?.querySelector("tbody");
+        if (!body) return;
+
+        body.innerHTML = events.length
+            ? events.map(event => `
+                <tr>
+                    <td>${escapeHtml(event.time)}</td>
+                    <td>${escapeHtml(event.type)}</td>
+                    <td>${escapeHtml(event.ip)}</td>
+                    <td>${escapeHtml(event.hostname)}</td>
+                </tr>
+            `).join("")
+            : '<tr><td colspan="4">No device events recorded yet.</td></tr>';
+    }
+
+    window.setInterval(refreshDashboard, refreshInterval);
+})();
+</script>
+</body>
+
 </body>
 </html>
 
