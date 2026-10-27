@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Network Scan History</title>
+    <title>Network Device Timeline</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -25,6 +24,15 @@
             overflow-x: auto;
         }
         h1, h2 { color: #f8fafc; }
+        .muted { color: #94a3b8; }
+        select {
+            background: #0f172a;
+            color: #e2e8f0;
+            border: 1px solid #475569;
+            padding: 10px;
+            border-radius: 6px;
+            max-width: 100%;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -37,14 +45,90 @@
             font-size: 14px;
         }
         th { color: #7dd3fc; }
-        .muted { color: #94a3b8; }
+        .timeline {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0 0;
+        }
+        .timeline li {
+            border-left: 3px solid #38bdf8;
+            padding: 4px 0 20px 18px;
+            margin-left: 6px;
+            position: relative;
+        }
+        .timeline li::before {
+            content: "";
+            position: absolute;
+            left: -7px;
+            top: 5px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #38bdf8;
+        }
+        .event-label {
+            font-weight: bold;
+            color: #7dd3fc;
+        }
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            .panel { padding: 14px; }
+        }
     </style>
 </head>
 <body>
 <main>
     <p><a href="/">← Back to Network Dashboard</a></p>
     <h1>Network Scan History</h1>
-    <p class="muted">Previous scans and recorded device events.</p>
+    <p class="muted">Review previous scans and follow recorded device events.</p>
+
+    <section class="panel">
+        <h2>Device Timeline</h2>
+        <label for="device-select">Select device IP address</label>
+        <br><br>
+        <select id="device-select">
+            <option value="all">All devices</option>
+            {% set device_ips = namespace(values=[]) %}
+            {% for item in history %}
+                {% for device in item.devices %}
+                    {% if device.ip and device.ip not in device_ips.values %}
+                        {% set _ = device_ips.values.append(device.ip) %}
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
+            {% for event in events %}
+                {% if event.ip and event.ip not in device_ips.values %}
+                    {% set _ = device_ips.values.append(event.ip) %}
+                {% endif %}
+            {% endfor %}
+            {% for ip in device_ips.values|sort %}
+                <option value="{{ ip }}">{{ ip }}</option>
+            {% endfor %}
+        </select>
+
+        <ul class="timeline" id="device-timeline">
+            {% for event in events %}
+                <li data-ip="{{ event.ip }}">
+                    <div class="event-label">
+                        {% if event.type == 'first_seen' %}
+                            First seen
+                        {% elif event.type == 'appeared' %}
+                            Device appeared
+                        {% elif event.type == 'not_seen' %}
+                            Device not seen
+                        {% else %}
+                            {{ event.type|replace('_', ' ')|title }}
+                        {% endif %}
+                    </div>
+                    <p>{{ event.ip }} — {{ event.hostname or 'Unknown' }}</p>
+                    <p class="muted">{{ event.time }} · Network: {{ event.network or 'Unknown' }}</p>
+                </li>
+            {% else %}
+                <li id="no-events">No device events recorded yet.</li>
+            {% endfor %}
+        </ul>
+        <p id="empty-timeline" class="muted" hidden>No events found for this device.</p>
+    </section>
 
     <section class="panel">
         <h2>Recent Scans</h2>
@@ -57,17 +141,17 @@
                 </tr>
             </thead>
             <tbody>
-            {% for item in history %}
-                <tr>
-                    <td>{{ item.time }}</td>
-                    <td>{{ item.network }}</td>
-                    <td>{{ item.device_count }}</td>
-                </tr>
-            {% else %}
-                <tr>
-                    <td colspan="3">No scan history yet. Run a scan from the dashboard.</td>
-                </tr>
-            {% endfor %}
+                {% for item in history %}
+                    <tr>
+                        <td>{{ item.time }}</td>
+                        <td>{{ item.network }}</td>
+                        <td>{{ item.device_count }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="3">No scan history yet. Run a scan from the dashboard.</td>
+                    </tr>
+                {% endfor %}
             </tbody>
         </table>
     </section>
@@ -89,22 +173,47 @@
                 </tr>
             </thead>
             <tbody>
-            {% for event in events %}
-                <tr>
-                    <td>{{ event.time }}</td>
-                    <td>{{ event.type }}</td>
-                    <td>{{ event.ip }}</td>
-                    <td>{{ event.hostname }}</td>
-                    <td>{{ event.mac }}</td>
-                </tr>
-            {% else %}
-                <tr>
-                    <td colspan="5">No device events recorded yet.</td>
-                </tr>
-            {% endfor %}
+                {% for event in events %}
+                    <tr>
+                        <td>{{ event.time }}</td>
+                        <td>{{ event.type|replace('_', ' ')|title }}</td>
+                        <td>{{ event.ip }}</td>
+                        <td>{{ event.hostname }}</td>
+                        <td>{{ event.mac }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5">No device events recorded yet.</td>
+                    </tr>
+                {% endfor %}
             </tbody>
         </table>
     </section>
 </main>
+
+<script>
+    const deviceSelect = document.getElementById("device-select");
+    const timelineItems = Array.from(
+        document.querySelectorAll("#device-timeline li[data-ip]")
+    );
+    const emptyMessage = document.getElementById("empty-timeline");
+
+    function filterTimeline() {
+        const selectedIP = deviceSelect.value;
+        let visibleCount = 0;
+
+        timelineItems.forEach((item) => {
+            const visible =
+                selectedIP === "all" || item.dataset.ip === selectedIP;
+
+            item.hidden = !visible;
+            if (visible) visibleCount++;
+        });
+
+        emptyMessage.hidden = visibleCount > 0;
+    }
+
+    deviceSelect.addEventListener("change", filterTimeline);
+</script>
 </body>
 </html>
