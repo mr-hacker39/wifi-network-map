@@ -24,6 +24,39 @@
             overflow-x: auto;
         }
         h1, h2 { color: #f8fafc; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .stat-card {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 18px;
+        }
+
+        .stat-card h3 {
+            margin: 0 0 10px;
+            color: #94a3b8;
+            font-size: 14px;
+            font-weight: normal;
+        }
+
+        .stat-value {
+            font-size: 30px;
+            font-weight: bold;
+            color: #f8fafc;
+        }
+
+        .stat-seen { color: #4ade80; }
+        .stat-missing { color: #fbbf24; }
+
+        @media (max-width: 600px) {
+            .stats-grid { grid-template-columns: 1fr; }
+        }
         .muted { color: #94a3b8; }
         select {
             background: #0f172a;
@@ -81,6 +114,30 @@
     <p><a href="/">← Back to Network Dashboard</a></p>
     <h1>Network Scan History</h1>
     <p class="muted">Review previous scans and follow recorded device events.</p>
+    <section class="panel">
+        <h2>Device Activity Statistics</h2>
+        <p class="muted">
+            Summary of devices recorded in the retained scan history.
+            Latest-scan status reflects scan observations, not guaranteed connectivity.
+        </p>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Unique Devices</h3>
+                <div class="stat-value">{{ total_devices }}</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>Seen in Latest Scan</h3>
+                <div class="stat-value stat-seen">{{ seen_in_latest }}</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>Not Seen in Latest Scan</h3>
+                <div class="stat-value stat-missing">{{ not_seen_in_latest }}</div>
+            </div>
+        </div>
+    </section>
 
     <section class="panel">
         <h2>Device Timeline</h2>
@@ -121,7 +178,7 @@
                         {% endif %}
                     </div>
                     <p>{{ event.ip }} — {{ event.hostname or 'Unknown' }}</p>
-                    <p class="muted">{{ event.time }} · Network: {{ event.network or 'Unknown' }}</p>
+                    <p class="muted">{{ event.time|local_datetime }} · Network: {{ event.network or 'Unknown' }}</p>
                 </li>
             {% else %}
                 <li id="no-events">No device events recorded yet.</li>
@@ -129,6 +186,61 @@
         </ul>
         <p id="empty-timeline" class="muted" hidden>No events found for this device.</p>
     </section>
+
+
+    <section class="panel">
+        <h2>Device Presence</h2>
+        <p class="muted">
+            Presence is based on recorded scans. Observed duration is the
+            time between first and last observations, not continuous uptime.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>IP Address</th>
+                    <th>Network</th>
+                    <th>First Seen</th>
+                    <th>Last Seen</th>
+                    <th>Scans Observed</th>
+                    <th>Latest Scan Status</th>
+                    <th>Observed Duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for device in presence %}
+                <tr>
+                    <td>{{ device.ip }}</td>
+                    <td>{{ device.network }}</td>
+                    <td>{{ device.first_seen|local_datetime }}</td>
+                    <td>{{ device.last_seen|local_datetime }}</td>
+                    <td>{{ device.scans_observed }}</td>
+                    <td>
+                        {% if device.latest_scan_status == 'Seen in latest scan' %}
+                            <span style="color: #4ade80;">Seen in latest scan</span>
+                        {% elif device.latest_scan_status == 'Not seen in latest scan' %}
+                            <span style="color: #fbbf24;">Not seen in latest scan</span>
+                        {% else %}
+                            <span class="muted">Unknown</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% set seconds = device.observed_duration_seconds %}
+                        {% set days = seconds // 86400 %}
+                        {% set hours = (seconds % 86400) // 3600 %}
+                        {% set minutes = (seconds % 3600) // 60 %}
+                        {{ days }}d {{ hours }}h {{ minutes }}m
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6">No device presence data recorded yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
 
     <section class="panel">
         <h2>Recent Scans</h2>
@@ -143,7 +255,7 @@
             <tbody>
                 {% for item in history %}
                     <tr>
-                        <td>{{ item.time }}</td>
+                        <td>{{ item.time|local_datetime }}</td>
                         <td>{{ item.network }}</td>
                         <td>{{ item.device_count }}</td>
                     </tr>
@@ -175,7 +287,7 @@
             <tbody>
                 {% for event in events %}
                     <tr>
-                        <td>{{ event.time }}</td>
+                        <td>{{ event.time|local_datetime }}</td>
                         <td>{{ event.type|replace('_', ' ')|title }}</td>
                         <td>{{ event.ip }}</td>
                         <td>{{ event.hostname }}</td>

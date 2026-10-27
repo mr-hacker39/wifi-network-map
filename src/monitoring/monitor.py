@@ -245,3 +245,105 @@ def get_events(limit=10):
     if not isinstance(events, list):
         return []
     return list(reversed(events[-limit:]))
+
+def get_device_presence():
+    """Summarize device presence from retained scan history."""
+    from datetime import datetime
+
+    history = read_json(HISTORY_FILE, [])
+    if not isinstance(history, list):
+        return []
+
+    devices = {}
+    latest_scan_by_network = {}
+
+    for scan in history:
+        if isinstance(scan, dict) and scan.get("time"):
+            network = scan.get("network", "Unknown")
+            latest_scan_by_network[network] = scan
+
+    for scan in history:
+        if not isinstance(scan, dict):
+            continue
+
+        scan_time = scan.get("time")
+        network = scan.get("network", "Unknown")
+
+        if not scan_time:
+            continue
+
+        try:
+            observed_at = datetime.fromisoformat(
+                scan_time.replace("Z", "+00:00")
+            )
+        except (ValueError, TypeError):
+            continue
+
+        for device in scan.get("devices", []):
+            if not isinstance(device, dict) or not device.get("ip"):
+                continue
+
+            key = (network, device["ip"])
+
+            if key not in devices:
+                devices[key] = {
+                    "ip": device["ip"],
+                    "network": network,
+                    "hostname": device.get("hostname", "Unknown"),
+                    "mac": device.get("mac", "Unknown"),
+                    "first_seen": scan_time,
+                    "last_seen": scan_time,
+                    "first_time": observed_at,
+                    "last_time": observed_at,
+                    "scans_observed": 0,
+                }
+
+            record = devices[key]
+            record["scans_observed"] += 1
+
+            if observed_at < record["first_time"]:
+                record["first_time"] = observed_at
+                record["first_seen"] = scan_time
+
+            if observed_at >= record["last_time"]:
+                record["last_time"] = observed_at
+                record["last_seen"] = scan_time
+                record["hostname"] = device.get("hostname", "Unknown")
+                record["mac"] = device.get("mac", "Unknown")
+
+    results = []
+
+    for record in devices.values():
+        duration = (
+            record["last_time"] - record["first_time"]
+        ).total_seconds()
+
+        record["observed_duration_seconds"] = max(0, int(duration))
+        latest_scan = latest_scan_by_network.get(record["network"])
+
+        if latest_scan is None:
+            record["latest_scan_status"] = "Unknown"
+        else:
+            latest_ips = {
+                device.get("ip")
+                for device in latest_scan.get("devices", [])
+                if isinstance(device, dict) and device.get("ip")
+            }
+
+            record["latest_scan_status"] = (
+                "Seen in latest scan"
+                if record["ip"] in latest_ips
+                else "Not seen in latest scan"
+            )
+
+        # Remove internal datetime values before returning JSON/template data.
+        del record["first_time"]
+        del record["last_time"]
+
+        results.append(record)
+
+    return sorted(
+        results,
+        key=lambda item: item["last_seen"],
+        reverse=True,
+    )

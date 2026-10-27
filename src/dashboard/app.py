@@ -24,6 +24,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from monitoring.monitor import (
+    get_device_presence,
     get_events,
     get_history,
     get_monitor_status,
@@ -36,6 +37,26 @@ SCAN_FILE = PROJECT_ROOT / "data" / "network_scan.json"
 MAP_FILE = PROJECT_ROOT / "docs" / "network_map.html"
 
 app = Flask(__name__)
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+
+@app.template_filter("local_datetime")
+def local_datetime(value):
+    """Format ISO timestamps in the system's local timezone."""
+    if not value:
+        return "Unknown"
+
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=ZoneInfo("UTC"))
+
+        local_time = parsed.astimezone(ZoneInfo("Asia/Kolkata"))
+        return local_time.strftime("%d %b %Y, %I:%M:%S %p")
+    except (ValueError, TypeError):
+        return value
 app.secret_key = os.environ.get(
     "FLASK_SECRET_KEY",
     "local-development-key-change-me",
@@ -141,10 +162,26 @@ def monitor_stop():
 
 @app.route("/history")
 def history_page():
+    presence = get_device_presence()
+
+    total_devices = len(presence)
+    seen_in_latest = sum(
+        1 for device in presence
+        if device.get("latest_scan_status") == "Seen in latest scan"
+    )
+    not_seen_in_latest = sum(
+        1 for device in presence
+        if device.get("latest_scan_status") == "Not seen in latest scan"
+    )
+
     return render_template(
         "history.html",
         history=get_history(100),
         events=get_events(100),
+        presence=presence,
+        total_devices=total_devices,
+        seen_in_latest=seen_in_latest,
+        not_seen_in_latest=not_seen_in_latest,
     )
 
 
