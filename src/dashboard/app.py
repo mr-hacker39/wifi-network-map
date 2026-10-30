@@ -90,6 +90,42 @@ def load_scan_data():
 
 @app.route("/")
 def dashboard():
+    presence = get_device_presence()
+    network_stats = {}
+
+    for device in presence:
+        network = device.get("network", "Unknown")
+
+        if network not in network_stats:
+            network_stats[network] = {
+                "network": network,
+                "total_devices": 0,
+                "seen_latest": 0,
+                "not_seen_latest": 0,
+            }
+
+        stats = network_stats[network]
+        stats["total_devices"] += 1
+
+        status = device.get("latest_scan_status")
+
+        if status == "Seen in latest scan":
+            stats["seen_latest"] += 1
+        elif status == "Not seen in latest scan":
+            stats["not_seen_latest"] += 1
+
+    for stats in network_stats.values():
+        total = stats["total_devices"]
+        stats["seen_percentage"] = (
+            round(stats["seen_latest"] / total * 100, 1)
+            if total else 0
+        )
+
+    network_stats = sorted(
+        network_stats.values(),
+        key=lambda item: item["network"],
+    )
+
     return render_template(
         "index.html",
         scan=load_scan_data(),
@@ -97,6 +133,7 @@ def dashboard():
         monitor=get_monitor_status(),
         history=get_history(10),
         events=get_events(10),
+        network_stats=network_stats,
     )
 
 

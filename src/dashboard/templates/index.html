@@ -115,6 +115,43 @@
             <p class="muted">Timestamp from scan data</p>
         </div>
     </section>
+        <section class="panel" id="network-analytics">
+        <h2>Network-wise Device Analytics</h2>
+        <p class="muted">
+            Device statistics based on retained scan history.
+        </p>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Network</th>
+                        <th>Total Devices</th>
+                        <th>Seen in Latest Scan</th>
+                        <th>Not Seen in Latest Scan</th>
+                        <th>Seen Percentage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stats in network_stats %}
+                    <tr>
+                        <td>{{ stats.network }}</td>
+                        <td>{{ stats.total_devices }}</td>
+                        <td>{{ stats.seen_latest }}</td>
+                        <td>{{ stats.not_seen_latest }}</td>
+                        <td>{{ stats.seen_percentage }}%</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5">
+                            No network history available yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
 
     <section class="panel" id="devices">
         <h2>Discovered Devices</h2>
